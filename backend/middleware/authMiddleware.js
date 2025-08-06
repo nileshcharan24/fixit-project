@@ -1,25 +1,19 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
+// Authenticates user via JWT
 const protect = async (req, res, next) => {
   let token;
 
-  // Check for token in Authorization header
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
   ) {
     try {
-      // Extract token
       token = req.headers.authorization.split(" ")[1];
-
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Attach user to request
       req.user = await User.findById(decoded.id).select("-password");
-
-      next(); // proceed to next handler
+      next();
     } catch (error) {
       console.error("Auth error:", error);
       res.status(401).json({ message: "Not authorized, token failed" });
@@ -31,4 +25,14 @@ const protect = async (req, res, next) => {
   }
 };
 
-export default protect;
+// Authorizes user based on role
+const authorizeRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied: insufficient permissions" });
+    }
+    next();
+  };
+};
+
+export { protect, authorizeRoles };

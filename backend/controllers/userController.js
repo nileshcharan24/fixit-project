@@ -22,15 +22,11 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash the password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
+    // Do NOT hash password manually here — pre("save") will handle it
     const newUser = new User({
       name,
       email,
-      password: hashedPassword,
+      password, // 👈 raw password
       role,
       apartmentNumber,
       skills,
@@ -58,27 +54,31 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log("Login attempt:", email);
 
-    // Check for user
     const user = await User.findOne({ email });
-
     if (!user) {
+      console.log("User not found with email:", email);
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Check password
+    console.log("User found:", user.email);
+    console.log("Stored hash:", user.password);
+    console.log("Input password:", password);
+
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log("Password match result:", isMatch);
+
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Send user info + token
     res.status(200).json({
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-      token: generateToken(user._id), // 🔑 Here's the token
+      token: generateToken(user._id),
     });
   } catch (error) {
     console.error("Error in loginUser:", error);
