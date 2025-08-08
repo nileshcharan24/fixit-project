@@ -107,3 +107,43 @@ export const getAllComplaints = async (req, res) => {
     res.status(500).json({ success: false, error: 'Server Error' });
   }
 };
+
+
+// @desc    Assign a complaint to a worker
+// @route   PUT /api/complaints/:id/assign
+// @access  Private (admin only)
+export const assignComplaint = async (req, res) => {
+  try {
+    const { workerId } = req.body;
+    const complaintId = req.params.id;
+
+    // 1. Check if a workerId was provided
+    if (!workerId) {
+      return res.status(400).json({ message: "Worker ID is required" });
+    }
+
+    // 2. Find the complaint to be assigned
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint) {
+      return res.status(404).json({ message: "Complaint not found" });
+    }
+
+    // 3. Find the user being assigned to ensure they are a valid worker
+    const worker = await User.findById(workerId);
+    if (!worker || worker.role !== 'worker') {
+      return res.status(404).json({ message: "Worker not found or this user is not a worker" });
+    }
+
+    // 4. Perform the assignment
+    complaint.assignedTo = workerId;
+    complaint.status = 'in progress'; // Good practice to update status on assignment
+
+    const updatedComplaint = await complaint.save();
+
+    res.status(200).json(updatedComplaint);
+
+  } catch (error) {
+    console.error("Error assigning complaint:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

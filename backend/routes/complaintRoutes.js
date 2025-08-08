@@ -4,6 +4,7 @@ import {
   updateComplaintStatus,
   getMyComplaints,
   getAllComplaints,
+  assignComplaint
 } from "../controllers/complaintController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
@@ -23,5 +24,10 @@ router.route("/mycomplaints").get(protect, getMyComplaints);
 router
   .route("/:id/status")
   .put(protect, authorizeRoles("admin", "worker"), updateComplaintStatus);
+
+// Add the new route for assigning a complaint
+router
+  .route("/:id/assign")
+  .put(protect, authorizeRoles("admin"), assignComplaint);
 
 export default router;
