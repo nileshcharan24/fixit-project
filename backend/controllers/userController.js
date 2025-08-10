@@ -1,10 +1,11 @@
+import asyncHandler from 'express-async-handler';
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 // Helper function to generate JWT
-const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "30d",
   });
 };
@@ -12,76 +13,73 @@ const generateToken = (userId) => {
 // @desc    Register new user
 // @route   POST /api/users/register
 // @access  Public
-export const registerUser = async (req, res) => {
-  try {
-    const { name, email, password, role, apartmentNumber, skills, phone } = req.body;
+export const registerUser = asyncHandler(async (req, res) => {
+  const { name, email, password, role, apartmentNumber, skills, phone } = req.body;
 
-    // Check if user already exists
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    // Do NOT hash password manually here — pre("save") will handle it
-    const newUser = new User({
-      name,
-      email,
-      password, // 👈 raw password
-      role,
-      apartmentNumber,
-      skills,
-      phone,
-    });
-
-    const savedUser = await newUser.save();
-
-    res.status(201).json({
-      _id: savedUser._id,
-      name: savedUser.name,
-      email: savedUser.email,
-      role: savedUser.role,
-      token: generateToken(savedUser._id),
-    });
-  } catch (error) {
-    console.error("Error in registerUser:", error);
-    res.status(500).json({ message: "Server error" });
+  const userExists = await User.findOne({ email });
+  if (userExists) {
+    res.status(400);
+    throw new Error("User already exists");
   }
-};
 
-// @desc    Login user
-// @route   POST /api/users/login
-// @access  Public
-export const loginUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    console.log("Login attempt:", email);
+  const user = await User.create({
+    name, email, password, role, apartmentNumber, skills, phone,
+  });
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      console.log("User not found with email:", email);
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    console.log("User found:", user.email);
-    console.log("Stored hash:", user.password);
-    console.log("Input password:", password);
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    console.log("Password match result:", isMatch);
-
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    res.status(200).json({
+  if (user) {
+    res.status(201).json({
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
       token: generateToken(user._id),
     });
-  } catch (error) {
-    console.error("Error in loginUser:", error);
-    res.status(500).json({ message: "Server error" });
+  } else {
+    res.status(400);
+    throw new Error('Invalid user data');
   }
-};
+});
+
+// @desc    Login user
+// @route   POST /api/users/login
+// @access  Public
+export const loginUser = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+
+  if (user && (await bcrypt.compare(password, user.password))) {
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id),
+    });
+  } else {
+    res.status(401);
+    throw new Error("Invalid email or password");
+  }
+});
+
+// === NEW FUNCTION ADDED BELOW ===
+
+// @desc    Get all users
+// @route   GET /api/users
+// @access  Private (Admin)
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const filter = {};
+  
+  // If a role is provided in the query, add it to the filter
+  if (req.query.role) {
+    filter.role = req.query.role;
+  }
+
+  // Find users based on the filter and exclude the password field
+  const users = await User.find(filter).select('-password');
+  
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
