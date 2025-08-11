@@ -2,9 +2,10 @@ import express from "express";
 import {
   registerUser,
   loginUser,
-  getAllUsers, // 1. Import the new controller
+  getAllUsers,
+  updateUserAvailability, // 1. Import the new function
 } from "../controllers/userController.js";
-import { protect, authorizeRoles } from "../middleware/authMiddleware.js"; // 2. Import middleware
+import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -13,7 +14,12 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 
 // Admin-only routes
-// 3. Add the new GET route
 router.route("/").get(protect, authorizeRoles("admin"), getAllUsers);
+
+// Worker-only routes
+// 2. Add the new route for updating availability
+router
+  .route("/availability")
+  .put(protect, authorizeRoles("worker"), updateUserAvailability);
 
 export default router;

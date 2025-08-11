@@ -7,32 +7,41 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-
     email: {
       type: String,
       required: true,
       unique: true,
     },
-
     password: {
       type: String,
       required: false, // optional if OAuth
     },
-
     role: {
       type: String,
       enum: ["resident", "worker", "admin"],
       default: "resident",
     },
-
     apartmentNumber: {
       type: String,
     },
-
     skills: {
       type: [String],
       default: [],
     },
+    
+    // === NEW FIELDS ADDED BELOW ===
+
+    isAvailable: {
+      type: Boolean,
+      default: false, // Workers are offline by default
+    },
+    
+    activeComplaintCount: {
+      type: Number,
+      default: 0,
+    },
+
+    // =============================
 
     assignedComplaints: [
       {
@@ -40,19 +49,15 @@ const userSchema = new mongoose.Schema(
         ref: "Complaint",
       },
     ],
-
     phone: {
       type: String,
     },
-
     avatar: {
       type: String,
     },
-
     googleId: {
       type: String,
     },
-
     isActive: {
       type: Boolean,
       default: true,
