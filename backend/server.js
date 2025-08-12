@@ -1,16 +1,18 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import http from 'http'; // 1. Import http module
-import { Server } from 'socket.io'; // 2. Import socket.io
+import http from 'http';
+import { Server } from 'socket.io';
+import passport from 'passport';
+
 import connectDB from './config/db.js';
-import redisClient from './config/redisClient.js'; // 3. Import the redisClient
+import redisClient from './config/redisClient.js';
+import './config/passport-setup.js'; // This will now correctly load with the environment variables
 
 import userRoutes from "./routes/userRoutes.js";
 import complaintRoutes from "./routes/complaintRoutes.js";
 import { errorHandler } from './middleware/errorMiddleware.js';
 
-dotenv.config();
+// Connect to Databases
 connectDB();
 
 const app = express();
@@ -18,6 +20,7 @@ const app = express();
 // ===== Middleware =====
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize());
 
 // ===== API Routes =====
 app.use("/api/users", userRoutes);
@@ -27,25 +30,24 @@ app.get('/', (req, res) => {
   res.send('🚀 Backend server is running...');
 });
 
+// ===== Error Handler =====
 app.use(errorHandler);
 
 // ===== WebSocket and Server Setup =====
-const server = http.createServer(app); // 4. Create an HTTP server from the Express app
+const server = http.createServer(app);
 
-const io = new Server(server, { // 5. Initialize socket.io with the server
+const io = new Server(server, {
   cors: {
-    origin: "*", // Allow all origins for simplicity. In production, restrict this.
+    origin: "*", // In production, restrict this to your frontend URL
     methods: ["GET", "POST"]
   }
 });
 
-// 6. Store connected users
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
   console.log('🔌 A user connected:', socket.id);
 
-  // Store the user ID when they authenticate
   socket.on('authenticate', (userId) => {
     connectedUsers.set(userId, socket.id);
     console.log(`User ${userId} authenticated with socket ${socket.id}`);
@@ -53,7 +55,6 @@ io.on('connection', (socket) => {
   
   socket.on('disconnect', () => {
     console.log('👋 A user disconnected:', socket.id);
-    // Remove user from the map on disconnect
     for (let [userId, socketId] of connectedUsers.entries()) {
       if (socketId === socket.id) {
         connectedUsers.delete(userId);
@@ -63,7 +64,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// 7. Subscribe to Redis notifications
+// Subscribe to Redis notifications
 (async () => {
   const subscriber = redisClient.duplicate();
   await subscriber.connect();
@@ -80,9 +81,8 @@ io.on('connection', (socket) => {
   });
 })();
 
-
 // ===== Start Server =====
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => { // 8. Start the HTTP server
+server.listen(PORT, () => {
   console.log(`✅ Server (including WebSocket) running at http://localhost:${PORT}`);
 });
